@@ -6,6 +6,7 @@ require('dotenv').config();
 const { Server } = require('socket.io');
 const harperSaveMessage = require('./services/save-message'); 
 const harperGetMessages = require('./services/get-messages');
+const leaveRoom = require('./utils/leave-room');
 
 app.use(cors());
 
@@ -61,6 +62,32 @@ io.on('connection', (socket) => {
     chatRoomUsers = allUsers.filter((user) => user.room === room);
     socket.to(room).emit('chatroom_users', chatRoomUsers);
     socket.emit('chatroom_users', chatRoomUsers);
+  });
+
+  socket.on('leave_room', (data) => {
+    const { username, room } = data;
+    socket.leave(room);
+    const __createdtime__ = Date.now();
+    allUsers = leaveRoom(socket.id, allUsers);
+    socket.to(room).emit('chatroom_users', allUsers);
+    socket.to(room).emit('receive_message', {
+      username: CHAT_BOT,
+      message: `${username} has left the chat`,
+      __createdtime__,
+    });
+    console.log(`${username} has left the chat`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected from the chat');
+    const user = allUsers.find((user) => user.id == socket.id);
+    if (user?.username) {
+      allUsers = leaveRoom(socket.id, allUsers);
+      socket.to(chatRoom).emit('chatroom_users', allUsers);
+      socket.to(chatRoom).emit('receive_message', {
+        message: `${user.username} uygulamadan ayrildi.`,
+      });
+    }
   });
 
   getMessages(room)
