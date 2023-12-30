@@ -2,7 +2,10 @@ const express = require('express');
 const app = express();
 http = require('http');
 const cors = require('cors');
+require('dotenv').config();
 const { Server } = require('socket.io');
+const harperSaveMessage = require('./services/save-message'); 
+const harperGetMessages = require('./services/get-messages');
 
 app.use(cors());
 
@@ -25,7 +28,13 @@ let allUsers = [];
 
 io.on('connection', (socket) => {
 
-  
+  socket.on('send_message', (data) => {
+    const { message, username, room, __createdtime__ } = data;
+    io.in(room).emit('receive_message', data);
+    harperSaveMessage(message, username, room, __createdtime__)
+      .then((response) => console.log(response))
+      .catch((err) => console.log(err));
+  });
 
   console.log(`User connected ${socket.id}`);
 
@@ -53,6 +62,12 @@ io.on('connection', (socket) => {
     socket.to(room).emit('chatroom_users', chatRoomUsers);
     socket.emit('chatroom_users', chatRoomUsers);
   });
+
+  getMessages(room)
+      .then((last100Messages) => {
+        socket.emit('last_100_messages', last100Messages);
+      })
+      .catch((err) => console.log(err));
 });
 
 server.listen(4000, () => '4000 portunda dinleme yapılıyor..');
